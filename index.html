@@ -504,17 +504,20 @@
         </footer>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    <script>
-        if (typeof SUPABASE_URL === 'undefined') {
-        var SUPABASE_URL = 'https://wzegexdicvceonwbvjwg.supabase.co';
-        var SUPABASE_KEY = 'sb_publishable_wwzSCimhG3fIWTYkIhh9zw_ZbXM-4Zm';
-    }
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
 
-    // Inicializa o cliente apenas se ele não existir
-    if (typeof supabase === 'undefined') {
-        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<script>
+    // 1. Configurações Iniciais
+    var SUPABASE_URL = 'https://wzegexdicvceonwbvjwg.supabase.co';
+    var SUPABASE_KEY = 'sb_publishable_wwzSCimhG3fIWTYkIhh9zw_ZbXM-4Zm';
+    var supabase;
+
+    // 2. Inicialização Segura
+    try {
+        // No navegador, a biblioteca expõe 'window.supabase.createClient'
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } catch (e) {
+        console.error("Erro ao inicializar Supabase:", e);
     }
 
     let estado = {
@@ -524,11 +527,17 @@
         isOrganizador: false
     };
 
+    // 3. Funções de Interface
     function mostrarMensagem(texto, tipo = 'success') {
         const el = document.getElementById('message');
+        if(!el) return;
         el.textContent = texto;
         el.className = `message message-${tipo}`;
-        setTimeout(() => el.className = 'message', 5000);
+        el.style.display = 'block';
+        setTimeout(() => {
+            el.style.display = 'none';
+            el.className = 'message';
+        }, 5000);
     }
 
     function mostrarErro(texto) {
@@ -537,11 +546,14 @@
 
     function mostrarTela(id) {
         ['screen-create', 'screen-organizer', 'screen-participant', 'screen-result'].forEach(screen => {
-            document.getElementById(screen).classList.add('hidden');
+            const el = document.getElementById(screen);
+            if(el) el.classList.add('hidden');
         });
-        document.getElementById(id).classList.remove('hidden');
+        const target = document.getElementById(id);
+        if(target) target.classList.remove('hidden');
     }
 
+    // 4. Lógica de Banco de Dados
     async function criarSorteio() {
         const nome = document.getElementById('sorteio-nome').value.trim();
         const codigo = document.getElementById('sorteio-codigo').value.trim().toUpperCase();
@@ -550,7 +562,7 @@
             mostrarErro('Por favor, preencha todos os campos');
             return;
         }
-        
+
         try {
             const { data, error } = await supabase
                 .from('sorteios')
@@ -562,7 +574,7 @@
                 if (error.code === '23505') {
                     mostrarErro('Este código já existe. Por favor, use um diferente.');
                 } else {
-                    mostrarErro('Erro: ' + error.message);
+                    mostrarErro('Erro no Banco: ' + error.message);
                 }
                 return;
             }
@@ -573,7 +585,7 @@
             mostrarTela('screen-organizer');
             mostrarMensagem('Sorteio criado com sucesso!');
         } catch (error) {
-            mostrarErro('Erro de conexão: ' + error.message);
+            mostrarErro('Erro crítico: ' + error.message);
         }
     }
         
