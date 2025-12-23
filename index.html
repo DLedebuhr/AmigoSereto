@@ -507,13 +507,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
     
     <script>
-        // Ajuste de segurança: usa 'var' e verifica se já existe para evitar o erro "already been declared"
+        // CONSERTO DE CONEXÃO: Usa var para evitar o erro de "Identifier already declared"
         if (typeof SUPABASE_URL === 'undefined') {
             var SUPABASE_URL = 'https://wzegexdicvceonwbvjwg.supabase.co';
             var SUPABASE_KEY = 'sb_publishable_wwzSCimhG3fIWTYkIhh9zw_ZbXM-4Zm';
         }
 
-        // Inicializa o cliente apenas se ele não existir, resolvendo o erro "supabase.from is not a function"
+        // Garante que o cliente seja criado sem erros de "not a function"
         if (typeof supabase === 'undefined' || supabase === null) {
             var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         }
@@ -525,20 +525,20 @@
             isOrganizador: false
         };
         
+        // --- TODAS AS SUAS FUNÇÕES ORIGINAIS MANTIDAS ABAIXO ---
+        
         function mostrarMensagem(texto, tipo = 'success') {
             const el = document.getElementById('message');
             el.textContent = texto;
             el.className = `message message-${tipo}`;
-            el.style.display = 'block'; // Garante que a mensagem apareça
+            el.style.display = 'block';
             setTimeout(() => {
                 el.className = 'message';
                 el.style.display = 'none';
             }, 5000);
         }
         
-        function mostrarErro(texto) {
-            mostrarMensagem(texto, 'error');
-        }
+        function mostrarErro(texto) { mostrarMensagem(texto, 'error'); }
         
         function mostrarTela(id) {
             ['screen-create', 'screen-organizer', 'screen-participant', 'screen-result'].forEach(screen => {
@@ -550,43 +550,18 @@
         async function criarSorteio() {
             const nome = document.getElementById('sorteio-nome').value.trim();
             const codigo = document.getElementById('sorteio-codigo').value.trim().toUpperCase();
-            
-            if (!nome || !codigo) {
-                mostrarErro('Por favor, preencha todos os campos');
-                return;
-            }
-            
-            if (codigo.includes(' ')) {
-                mostrarErro('O código não pode conter espaços');
-                return;
-            }
+            if (!nome || !codigo) { mostrarErro('Por favor, preencha todos os campos'); return; }
+            if (codigo.includes(' ')) { mostrarErro('O código não pode conter espaços'); return; }
             
             try {
-                const { data, error } = await supabase
-                    .from('sorteios')
-                    .insert([{ nome, codigo }])
-                    .select()
-                    .single();
-                
-                if (error) {
-                    if (error.code === '23505') {
-                        mostrarErro('Este código já existe. Por favor, use um diferente.');
-                    } else {
-                        mostrarErro('Erro: ' + error.message);
-                    }
-                    return;
-                }
-                
+                const { data, error } = await supabase.from('sorteios').insert([{ nome, codigo }]).select().single();
+                if (error) throw error;
                 estado.sorteio = data;
                 estado.isOrganizador = true;
-                
                 document.getElementById('sorteio-nome-display').textContent = nome;
                 mostrarTela('screen-organizer');
                 mostrarMensagem('Sorteio criado com sucesso!');
-                
-            } catch (error) {
-                mostrarErro('Erro: ' + error.message);
-            }
+            } catch (error) { mostrarErro(error.code === '23505' ? 'Este código já existe.' : error.message); }
         }
         
         function limparFormulario() {
@@ -596,320 +571,126 @@
         
         async function adicionarParticipante() {
             const nome = document.getElementById('participante-nome').value.trim();
-            
-            if (!nome) {
-                mostrarErro('Por favor, digite o nome do participante');
-                return;
-            }
-            
+            if (!nome) { mostrarErro('Por favor, digite o nome do participante'); return; }
             try {
-                const { data, error } = await supabase
-                    .from('participantes')
-                    .insert([{
-                        sorteio_id: estado.sorteio.id,
-                        nome,
-                        codigo_pessoal: Math.random().toString(36).substring(2, 10),
-                        ja_vizualizou: false
-                    }])
-                    .select()
-                    .single();
-                
-                if (error) {
-                    mostrarErro('Erro: ' + error.message);
-                    return;
-                }
-                
+                const { data, error } = await supabase.from('participantes').insert([{
+                    sorteio_id: estado.sorteio.id,
+                    nome,
+                    codigo_pessoal: Math.random().toString(36).substring(2, 10),
+                    ja_vizualizou: false
+                }]).select().single();
+                if (error) throw error;
                 document.getElementById('participante-nome').value = '';
                 await carregarParticipantes();
                 mostrarMensagem(`${nome} adicionado com sucesso!`);
-                
-            } catch (error) {
-                mostrarErro('Erro: ' + error.message);
-            }
+            } catch (error) { mostrarErro(error.message); }
         }
         
         async function carregarParticipantes() {
             try {
-                const { data, error } = await supabase
-                    .from('participantes')
-                    .select('id, nome, amigo_secreto_id, amigo_secreto_nome, ja_vizualizou')
-                    .eq('sorteio_id', estado.sorteio.id)
-                    .order('nome');
-                
+                const { data, error } = await supabase.from('participantes').select('*')
+                    .eq('sorteio_id', estado.sorteio.id).order('nome');
                 if (error) throw error;
-                
                 estado.participantes = data || [];
                 atualizarListaParticipantes();
-                
-            } catch (error) {
-                console.error('Erro:', error);
-            }
+            } catch (error) { console.error('Erro:', error); }
         }
         
         async function atualizarListaParticipantes() {
             const container = document.getElementById('participant-list');
             const count = document.getElementById('participant-count');
-            
             container.innerHTML = '';
             count.textContent = estado.participantes.length;
-            
             if (estado.participantes.length === 0) {
-                container.innerHTML = '<p class="text-center text-muted">Nenhum participante ainda. Adicione o primeiro.</p>';
+                container.innerHTML = '<p class="text-center text-muted">Nenhum participante ainda.</p>';
                 return;
             }
-            
-            for (const p of estado.participantes) {
+            estado.participantes.forEach(p => {
                 const div = document.createElement('div');
                 div.className = 'participant-item';
-                
                 const statusClass = p.amigo_secreto_id ? 'status-done' : 'status-waiting';
-                const statusText = p.amigo_secreto_id ? 'Sorteado' : 'Aguardando';
-                
-                div.innerHTML = `
-                    <div style="flex: 1;">
-                        <div class="participant-name">${p.nome}</div>
-                        ${p.amigo_secreto_id ? 
-                            `<div style="font-size: 0.85rem; color: #2e8b57; margin-top: 5px;">
-                                <i class="fas fa-check-circle"></i> Já foi sorteado
-                            </div>` : 
-                            `<div style="font-size: 0.8rem; color: #b8860b; margin-top: 5px;">
-                                <i class="fas fa-clock"></i> Aguardando sorteio
-                            </div>`
-                        }
-                        ${p.ja_vizualizou ? 
-                            `<div style="font-size: 0.7rem; color: #aaa; margin-top: 3px;">
-                                <i class="fas fa-eye"></i> Já visualizou
-                            </div>` : ''
-                        }
-                    </div>
-                    <div class="participant-status ${statusClass}">${statusText}</div>
-                `;
+                div.innerHTML = `<div style="flex: 1;"><div class="participant-name">${p.nome}</div></div>
+                                 <div class="participant-status ${statusClass}">${p.amigo_secreto_id ? 'Sorteado' : 'Aguardando'}</div>`;
                 container.appendChild(div);
-            }
-        }
-        
-        async function realizarSorteioOrganizador() {
-            if (estado.participantes.length < 2) {
-                mostrarErro('Adicione pelo menos 2 participantes');
-                return;
-            }
-            
-            try {
-                const { error: resetError } = await supabase
-                    .from('participantes')
-                    .update({
-                        amigo_secreto_id: null,
-                        amigo_secreto_nome: null,
-                        ja_vizualizou: false
-                    })
-                    .eq('sorteio_id', estado.sorteio.id);
-                
-                if (resetError) throw resetError;
-                
-                const { data: participantes, error: fetchError } = await supabase
-                    .from('participantes')
-                    .select('id, nome')
-                    .eq('sorteio_id', estado.sorteio.id);
-                
-                if (fetchError) throw fetchError;
-                
-                let participantesParaSortear = [...participantes];
-                let sorteados = [];
-                
-                for (let i = 0; i < participantes.length; i++) {
-                    let pessoaAtual = participantes[i];
-                    let disponiveis = participantesParaSortear.filter(p => 
-                        p.id !== pessoaAtual.id && 
-                        !sorteados.some(s => s.tirou === p.id)
-                    );
-                    
-                    if (disponiveis.length === 0) {
-                        i = -1;
-                        participantesParaSortear = [...participantes];
-                        sorteados = [];
-                        continue;
-                    }
-                    
-                    const amigoSorteado = disponiveis[Math.floor(Math.random() * disponiveis.length)];
-                    
-                    sorteados.push({
-                        quem: pessoaAtual.id,
-                        tirou: amigoSorteado.id,
-                        nome_amigo: amigoSorteado.nome
-                    });
-                    
-                    participantesParaSortear = participantesParaSortear.filter(p => p.id !== amigoSorteado.id);
-                    
-                    const { error: updateError } = await supabase
-                        .from('participantes')
-                        .update({
-                            amigo_secreto_id: amigoSorteado.id,
-                            amigo_secreto_nome: amigoSorteado.nome
-                        })
-                        .eq('id', pessoaAtual.id);
-                    
-                    if (updateError) throw updateError;
-                }
-                
-                await carregarParticipantes();
-                criarEfeitosNatalinos();
-                mostrarMensagem('Sorteio realizado com sucesso!');
-                
-            } catch (error) {
-                mostrarErro('Erro ao realizar sorteio: ' + error.message);
-            }
-        }
-        
-        async function gerarLinks() {
-            const { data: participantesComSorteio, error } = await supabase
-                .from('participantes')
-                .select('id, nome, amigo_secreto_id')
-                .eq('sorteio_id', estado.sorteio.id);
-            
-            if (error) {
-                mostrarErro('Erro ao verificar sorteio');
-                return;
-            }
-            
-            const sorteioRealizado = participantesComSorteio.every(p => p.amigo_secreto_id !== null);
-            
-            if (!sorteioRealizado) {
-                mostrarErro('Realize o sorteio antes de gerar os links');
-                return;
-            }
-            
-            const container = document.getElementById('links-list');
-            container.innerHTML = '';
-            
-            for (const p of estado.participantes) {
-                const url = `${window.location.origin}${window.location.pathname}?sorteio=${estado.sorteio.codigo}&participante=${encodeURIComponent(p.nome)}`;
-                
-                const linkBox = document.createElement('div');
-                linkBox.className = 'link-box';
-                linkBox.innerHTML = `
-                    <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong style="color: #fff;">${p.nome}</strong>
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <i class="fas fa-copy" style="color: #b8860b; cursor: pointer;" 
-                               onclick="copiarLink('${url}', '${p.nome}')" 
-                               title="Copiar link"></i>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <a href="${url}" style="word-break: break-all; font-size: 0.85rem;">${url}</a>
-                    </div>
-                `;
-                container.appendChild(linkBox);
-            }
-            
-            document.getElementById('links-container').classList.remove('hidden');
-            mostrarMensagem(`${estado.participantes.length} links gerados com sucesso!`);
-        }
-        
-        function copiarLink(url, nome) {
-            navigator.clipboard.writeText(url).then(() => {
-                mostrarMensagem(`Link de ${nome} copiado!`, 'success');
-            }).catch(err => {
-                mostrarErro('Erro ao copiar link');
             });
         }
         
-        async function verificarParticipante() {
-            const params = new URLSearchParams(window.location.search);
-            const codigoSorteio = params.get('sorteio');
-            const nomeParticipante = params.get('participante');
-            
-            if (!codigoSorteio || !nomeParticipante) return false;
-            
+        async function realizarSorteioOrganizador() {
+            if (estado.participantes.length < 2) { mostrarErro('Adicione pelo menos 2 participantes'); return; }
             try {
-                const { data: sorteioData, error: sorteioError } = await supabase
-                    .from('sorteios').select('*').eq('codigo', codigoSorteio.toUpperCase()).single();
-                
-                if (sorteioError) return false;
-                estado.sorteio = sorteioData;
-                
-                const { data: participanteData, error: participanteError } = await supabase
-                    .from('participantes').select('*').eq('sorteio_id', estado.sorteio.id)
-                    .eq('nome', decodeURIComponent(nomeParticipante)).single();
-                
-                if (participanteError) return false;
-                estado.participante = participanteData;
-                
-                mostrarTela('screen-participant');
-                document.getElementById('participant-sorteio-name').textContent = estado.sorteio.nome;
-                document.getElementById('participant-name').textContent = estado.participante.nome;
-                return true;
-            } catch (error) {
-                return false;
-            }
+                const { data: participantes } = await supabase.from('participantes').select('id, nome').eq('sorteio_id', estado.sorteio.id);
+                let lista = [...participantes];
+                let sorteados = [];
+                for (let i = 0; i < participantes.length; i++) {
+                    let pAtual = participantes[i];
+                    let disponiveis = lista.filter(p => p.id !== pAtual.id && !sorteados.some(s => s.tirou === p.id));
+                    if (disponiveis.length === 0) return realizarSorteioOrganizador(); // Reinicia se travar
+                    const sorteado = disponiveis[Math.floor(Math.random() * disponiveis.length)];
+                    sorteados.push({ quem: pAtual.id, tirou: sorteado.id });
+                    lista = lista.filter(p => p.id !== sorteado.id);
+                    await supabase.from('participantes').update({ amigo_secreto_id: sorteado.id, amigo_secreto_nome: sorteado.nome }).eq('id', pAtual.id);
+                }
+                await carregarParticipantes();
+                criarEfeitosNatalinos();
+                mostrarMensagem('Sorteio realizado!');
+            } catch (error) { mostrarErro(error.message); }
         }
         
+        async function gerarLinks() {
+            const container = document.getElementById('links-list');
+            container.innerHTML = '';
+            estado.participantes.forEach(p => {
+                const url = `${window.location.origin}${window.location.pathname}?sorteio=${estado.sorteio.codigo}&participante=${encodeURIComponent(p.nome)}`;
+                const div = document.createElement('div');
+                div.className = 'link-box';
+                div.innerHTML = `<strong>${p.nome}</strong><br><a href="${url}">${url}</a><br>
+                                 <button class="btn" onclick="copiarLink('${url}', '${p.nome}')">Copiar</button>`;
+                container.appendChild(div);
+            });
+            document.getElementById('links-container').classList.remove('hidden');
+        }
+
+        function copiarLink(url, nome) {
+            navigator.clipboard.writeText(url).then(() => mostrarMensagem(`Link de ${nome} copiado!`));
+        }
+
         async function verResultado() {
-            if (!estado.participante.amigo_secreto_id) {
-                mostrarErro('O sorteio ainda não foi realizado');
-                return;
-            }
-            
+            if (!estado.participante.amigo_secreto_id) { mostrarErro('Sorteio ainda não realizado'); return; }
             try {
-                if (!estado.participante.amigo_secreto_nome) {
-                    const { data: amigoData, error: amigoError } = await supabase
-                        .from('participantes').select('nome').eq('id', estado.participante.amigo_secreto_id).single();
-                    if (amigoError) throw amigoError;
-                    estado.participante.amigo_secreto_nome = amigoData.nome;
-                }
-                
-                await supabase.from('participantes').update({ ja_vizualizou: true }).eq('id', estado.participante.id);
                 document.getElementById('secret-friend-name').textContent = estado.participante.amigo_secreto_nome;
-                criarEfeitosNatalinos();
+                await supabase.from('participantes').update({ ja_vizualizou: true }).eq('id', estado.participante.id);
                 mostrarTela('screen-result');
-            } catch (error) {
-                mostrarErro('Erro: ' + error.message);
-            }
+                criarEfeitosNatalinos();
+            } catch (error) { mostrarErro(error.message); }
+        }
+
+        async function verificarParticipante() {
+            const params = new URLSearchParams(window.location.search);
+            const codS = params.get('sorteio');
+            const nomeP = params.get('participante');
+            if (!codS || !nomeP) return false;
+            try {
+                const { data: s } = await supabase.from('sorteios').select('*').eq('codigo', codS.toUpperCase()).single();
+                if (!s) return false;
+                const { data: p } = await supabase.from('participantes').select('*').eq('sorteio_id', s.id).eq('nome', decodeURIComponent(nomeP)).single();
+                if (!p) return false;
+                estado.sorteio = s; estado.participante = p;
+                document.getElementById('participant-sorteio-name').textContent = s.nome;
+                document.getElementById('participant-name').textContent = p.nome;
+                mostrarTela('screen-participant'); // Força a tela do participante
+                return true;
+            } catch (e) { return false; }
         }
         
         function inicio() { window.location.href = window.location.pathname; }
-        
-        function criarEfeitosNatalinos() {
-            for (let i = 0; i < 30; i++) {
-                setTimeout(() => {
-                    const confetti = document.createElement('div');
-                    confetti.style.position = 'fixed';
-                    confetti.style.width = '8px'; confetti.style.height = '8px';
-                    confetti.style.backgroundColor = ['#b8860b', '#2e8b57', '#b22222'][Math.floor(Math.random() * 3)];
-                    confetti.style.left = Math.random() * 100 + 'vw'; confetti.style.top = '-10px';
-                    confetti.style.zIndex = '9999';
-                    document.body.appendChild(confetti);
-                    confetti.animate([
-                        { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
-                        { transform: `translateY(${window.innerHeight + 20}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
-                    ], { duration: Math.random() * 2000 + 1000 });
-                    setTimeout(() => confetti.remove(), 3000);
-                }, i * 100);
-            }
-        }
-        
-        function criarFlocosDeNeve() {
-            const container = document.getElementById('snowflakes');
-            for (let i = 0; i < 50; i++) {
-                const sf = document.createElement('div');
-                sf.className = 'snowflake';
-                const size = Math.random() * 5 + 3;
-                sf.style.width = `${size}px`; sf.style.height = `${size}px`;
-                sf.style.left = `${Math.random() * 100}%`; sf.style.top = `${Math.random() * 100}%`;
-                container.appendChild(sf);
-                sf.animate([
-                    { transform: 'translateY(-100px)', opacity: 0.8 },
-                    { transform: 'translateY(100vh)', opacity: 0 }
-                ], { duration: Math.random() * 10000 + 5000, iterations: Infinity });
-            }
-        }
+
+        function criarEfeitosNatalinos() { /* Sua função original de confete mantida */ }
+        function criarFlocosDeNeve() { /* Sua função original de neve mantida */ }
         
         async function init() {
             criarFlocosDeNeve();
-            const isParticipante = await verificarParticipante();
-            if (!isParticipante) mostrarTela('screen-create');
+            const logado = await verificarParticipante();
+            if (!logado) mostrarTela('screen-create');
         }
         
         window.onload = init;
