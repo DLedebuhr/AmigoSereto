@@ -507,18 +507,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
     
     <script>
-        // 1. CONEXÃO SIMPLIFICADA (Sem 'const' para não travar o site)
+        // CONSERTO DE CONEXÃO (Sem travar o site)
         var SUPABASE_URL = 'https://wzegexdicvceonwbvjwg.supabase.co';
         var SUPABASE_KEY = 'sb_publishable_wwzSCimhG3fIWTYkIhh9zw_ZbXM-4Zm';
         var supabase;
 
-        // Inicialização que espera o navegador estar pronto
-        function conectarBanco() {
-            if (window.supabase) {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            }
+        if (window.supabase) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         }
-        conectarBanco();
 
         let estado = {
             sorteio: null,
@@ -527,11 +523,9 @@
             isOrganizador: false
         };
 
-        // --- SUAS FUNÇÕES ORIGINAIS MANTIDAS ---
-
+        // --- SUAS FUNÇÕES ORIGINAIS DE INTERFACE ---
         function mostrarMensagem(texto, tipo = 'success') {
             const el = document.getElementById('message');
-            if(!el) return;
             el.textContent = texto;
             el.className = `message message-${tipo}`;
             el.style.display = 'block';
@@ -549,12 +543,11 @@
             if(target) target.classList.remove('hidden');
         }
 
+        // --- SUAS FUNÇÕES ORIGINAIS DE LÓGICA ---
         async function criarSorteio() {
             const nome = document.getElementById('sorteio-nome').value.trim();
             const codigo = document.getElementById('sorteio-codigo').value.trim().toUpperCase();
-            
             if (!nome || !codigo) return mostrarErro('Preencha os campos!');
-            
             try {
                 const { data, error } = await supabase.from('sorteios').insert([{ nome, codigo }]).select().single();
                 if (error) throw error;
@@ -569,7 +562,6 @@
         async function adicionarParticipante() {
             const nome = document.getElementById('participante-nome').value.trim();
             if (!nome) return mostrarErro('Digite o nome');
-            
             try {
                 const { error } = await supabase.from('participantes').insert([{
                     sorteio_id: estado.sorteio.id,
@@ -611,12 +603,9 @@
             try {
                 let lista = [...estado.participantes];
                 let embaralhado = [...lista].sort(() => Math.random() - 0.5);
-                
-                // Validação para ninguém tirar a si mesmo
                 for(let i=0; i<lista.length; i++) {
                     if(lista[i].id === embaralhado[i].id) return realizarSorteioOrganizador();
                 }
-
                 for(let i=0; i<lista.length; i++) {
                     await supabase.from('participantes').update({
                         amigo_secreto_id: embaralhado[i].id,
@@ -624,6 +613,7 @@
                     }).eq('id', lista[i].id);
                 }
                 await carregarParticipantes();
+                criarEfeitosNatalinos(); // Chamando seus efeitos
                 mostrarMensagem('Sorteio realizado!');
             } catch (e) { mostrarErro('Erro ao sortear'); }
         }
@@ -646,32 +636,74 @@
             const codS = params.get('sorteio');
             const nomeP = params.get('participante');
             if (!codS || !nomeP) return false;
-
-            const { data: s } = await supabase.from('sorteios').select('*').eq('codigo', codS.toUpperCase()).single();
-            if (!s) return false;
-            
-            const { data: p } = await supabase.from('participantes').select('*').eq('sorteio_id', s.id).eq('nome', decodeURIComponent(nomeP)).single();
-            if (!p) return false;
-
-            estado.sorteio = s;
-            estado.participante = p;
-            document.getElementById('participant-sorteio-name').textContent = s.nome;
-            document.getElementById('participant-name').textContent = p.nome;
-            mostrarTela('screen-participant');
-            return true;
+            try {
+                const { data: s } = await supabase.from('sorteios').select('*').eq('codigo', codS.toUpperCase()).single();
+                if (!s) return false;
+                const { data: p } = await supabase.from('participantes').select('*').eq('sorteio_id', s.id).eq('nome', decodeURIComponent(nomeP)).single();
+                if (!p) return false;
+                estado.sorteio = s;
+                estado.participante = p;
+                document.getElementById('participant-sorteio-name').textContent = s.nome;
+                document.getElementById('participant-name').textContent = p.nome;
+                mostrarTela('screen-participant');
+                return true;
+            } catch (e) { return false; }
         }
 
         async function verResultado() {
             if (!estado.participante.amigo_secreto_nome) return mostrarErro('Sorteio ainda não realizado');
             document.getElementById('secret-friend-name').textContent = estado.participante.amigo_secreto_nome;
+            criarEfeitosNatalinos(); // Seus efeitos ao revelar
             mostrarTela('screen-result');
             await supabase.from('participantes').update({ ja_vizualizou: true }).eq('id', estado.participante.id);
         }
 
         function inicio() { window.location.href = window.location.pathname; }
 
+        // --- SEUS EFEITOS ORIGINAIS RECUPERADOS ---
+        function criarEfeitosNatalinos() {
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.style.position = 'fixed';
+                    confetti.style.width = '10px';
+                    confetti.style.height = '10px';
+                    confetti.style.backgroundColor = ['#b8860b', '#2e8b57', '#b22222', '#fff'][Math.floor(Math.random() * 4)];
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.top = '-10px';
+                    confetti.style.zIndex = '9999';
+                    confetti.style.borderRadius = '50%';
+                    document.body.appendChild(confetti);
+                    confetti.animate([
+                        { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
+                        { transform: `translateY(${window.innerHeight + 20}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                    ], { duration: Math.random() * 2000 + 2000 });
+                    setTimeout(() => confetti.remove(), 4000);
+                }, i * 50);
+            }
+        }
+
+        function criarFlocosDeNeve() {
+            const container = document.getElementById('snowflakes');
+            if(!container) return;
+            for (let i = 0; i < 50; i++) {
+                const sf = document.createElement('div');
+                sf.className = 'snowflake';
+                const size = Math.random() * 5 + 2;
+                sf.style.width = `${size}px`;
+                sf.style.height = `${size}px`;
+                sf.style.left = `${Math.random() * 100}%`;
+                sf.style.opacity = Math.random();
+                container.appendChild(sf);
+                sf.animate([
+                    { transform: 'translateY(-10vh)', opacity: 0 },
+                    { transform: 'translateY(100vh)', opacity: 0.8 }
+                ], { duration: Math.random() * 10000 + 5000, iterations: Infinity });
+            }
+        }
+
         async function init() {
-            if (typeof criarFlocosDeNeve === 'function') criarFlocosDeNeve();
+            criarFlocosDeNeve();
             const logado = await verificarParticipante();
             if (!logado) mostrarTela('screen-create');
         }
