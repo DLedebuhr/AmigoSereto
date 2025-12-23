@@ -507,10 +507,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <script>
-        const SUPABASE_URL = 'https://wzegexdicvceonwbvjwg.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_wwzSCimhG3fIWTYkIhh9zw_ZbXM-4Zm';
-        
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        if (typeof supabase === 'undefined') {
+            var SUPABASE_URL = 'https://wzegexdicvceonwbvjwg.supabase.co';
+            var SUPABASE_KEY = 'sb_publishable_wwzSCimhG3fIWTYkIhh9zw_ZbXM-4Zm';
+            var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        }
         
         let estado = {
             sorteio: null,
